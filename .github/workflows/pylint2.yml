@@ -1,0 +1,61 @@
+name: Python autotests with Allure
+
+on: 
+   workflow_dispatch:
+      inputs:
+         deployment_target:
+            description: choose tests set
+            required: true
+            type: choice
+            default: smoke
+            options:
+               - smoke
+               - regression
+               - all
+   
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    name: Run autotests
+    steps:
+      - name: Run autotests
+        uses: actions/checkout@v4
+      - name: Set up Python evironment
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Pip Upgrade
+        run:
+          python -m pip install --upgrade pip
+      - name: Install dependencies
+        run:  
+          pip install -r requirements.txt
+      - name: run all tests
+        if: "github.event.inputs.deployment_target == 'all'"  
+        run: pytest --alluredir=allure-results
+        continue-on-error: true
+      - name: run smoke tests
+        if: "github.event.inputs.deployment_target == 'smoke'"  
+        run: pytest -m smoke --alluredir=allure-results
+        continue-on-error: true
+      - name: run regression tests
+        if: "github.event.inputs.deployment_target == 'regression'"  
+        run: pytest -m regression --alluredir=allure-results
+        continue-on-error: true
+      - name: Install Java
+        uses: actions/setup-java@v3
+        with:
+           distribution: 'microsoft'
+           java-version: '17'
+      - name: Install Allure
+        run: sudo wget https://github.com/allure-framework/allure2/releases/download/2.24.1/allure-2.24.1.tgz && sudo tar -zxvf allure-2.24.1.tgz -C /opt/ && sudo ln -s /opt/allure-2.24.1/bin/allure /usr/bin/allure
+      - name: Add Executor And Categories in Allure Results
+        run: cp -r categories.json executor.json allure-results/  
+      - name: Generate report  
+        run: allure generate -c allure-results -o allure-report
+      - name: Save allure report
+        uses: actions/upload-artifact@v3
+        with:
+           name: allure-report
+           path: allure-report
+           etention-days: 1
